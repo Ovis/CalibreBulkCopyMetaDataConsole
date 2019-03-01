@@ -1,16 +1,9 @@
 ﻿using CalibreSetMetaData.Domain;
+using Codeplex.Data;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Text;
-using System.Xml.Linq;
-using System.Threading.Tasks;
-using System.Xml;
-using System.Xml.Serialization;
-using Newtonsoft.Json;
-using CalibreSetMetaData.Entity;
 using System.Text.RegularExpressions;
 
 namespace CalibreSetMetaData
@@ -31,8 +24,9 @@ namespace CalibreSetMetaData
             psInfo.FileName = calibreDbPath;
 
             //引数
-            //psInfo.Arguments = @"show_metadata --as-opf --library-path=" + setting.CalibreLibraryPath + " 4";
-            psInfo.Arguments = @"list --library-path=" + setting.CalibreLibraryPath + " --fields " + setting.SourceColumn + ",*" + setting.DestinationColumn + " --for-machine";
+            psInfo.Arguments = @"list --library-path=" + setting.CalibreLibraryPath + " --fields "
+                + (setting.SrcClmCustomClmFlg ? "*" : "") + setting.SourceColumn + ","
+                + (setting.DestClmCustomClmFlg ? "*" : "") + setting.DestinationColumn + " --for-machine";
 
             // コンソール・ウィンドウを開かない
             psInfo.CreateNoWindow = true;
@@ -48,52 +42,72 @@ namespace CalibreSetMetaData
             // アプリの実行開始
             using (Process p = Process.Start(psInfo))
             {
-                // 標準出力の読み取り
                 output = p.StandardOutput.ReadToEnd();
 
                 output = Regex.Unescape(output.Replace(@"*", "")); // カスタム列のアスタリスク削除
 
-                if(p.ExitCode != 0)
+                if (p.ExitCode != 0)
                 {
                     Console.WriteLine("Error! Calibreを実行中の可能性あり。");
+                    ConsoleWait();
                     return;
                 }
             }
 
-            var json = JsonConvert.DeserializeObject<List<CalibreList>>(output);
-
-            //カラムに値の入っていないものを取得
-            var targetData = json.Where(x => x.OriginalTitle == null).ToList();
+            var jsonData = DynamicJson.Parse(output);
 
             psInfo.StandardOutputEncoding = null;
 
-            foreach (var target in targetData)
+            foreach (var item in jsonData)
             {
-                //Calibreに値をセットするために引数を設定
-                psInfo.Arguments = @"set_metadata --field #" + setting.DestinationColumn + ":\"" + target.Title + "\"" +" --library-path=" + setting.CalibreLibraryPath + " " + target.Id;
-
-                try
+                //対象データが存在するもののみ処理を行う
+                if (item.IsDefined("id") & item.IsDefined(setting.SourceColumn))
                 {
-                    // アプリの実行開始
-                    using (Process p = Process.Start(psInfo))
+                    //コピー先カラムに値がある場合は処理対象外1
+                    if (!item.IsDefined(setting.DestinationColumn))
                     {
-                        // 標準出力の読み取り
-                        output = p.StandardOutput.ReadToEnd();
+                        //Calibreに値をセットするために引数を設定
+                        psInfo.Arguments = @"set_metadata --field " + (setting.DestClmCustomClmFlg ? "#" : "")
+                            + setting.DestinationColumn + ":\"" + item[setting.SourceColumn] + "\"" + " --library-path="
+                            + setting.CalibreLibraryPath + " " + item["id"];
 
-                        if (p.ExitCode != 0)
+                        try
                         {
-                            Console.WriteLine("Error!");
-                            return;
+                            // アプリの実行開始
+                            using (Process p = Process.Start(psInfo))
+                            {
+                                output = p.StandardOutput.ReadToEnd();
+
+                                if (p.ExitCode != 0)
+                                {
+                                    Console.WriteLine("Error!");
+                                    ConsoleWait();
+                                    return;
+                                }
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            Console.WriteLine(e.Message);
+                            ConsoleWait();
                         }
                     }
-                }catch(Exception e)
-                {
-                    Console.WriteLine(e.Message);
                 }
             }
 
             Console.WriteLine("Finish.");
+            ConsoleWait();
+
         }
 
+        /// <summary>
+        /// コンソール用待機処理
+        /// </summary>
+        public static void ConsoleWait()
+        {
+
+            Console.WriteLine("続行するには何かキーを押してください．．．");
+            Console.ReadKey();
+        }
     }
 }

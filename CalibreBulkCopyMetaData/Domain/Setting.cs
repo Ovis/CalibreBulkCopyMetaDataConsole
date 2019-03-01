@@ -21,8 +21,14 @@ namespace CalibreSetMetaData.Domain
         //コピー元カラム
         public string SourceColumn => Configuration["SourceColumn"];
 
+        //コピー元カラムがカスタムカラムか否か
+        public bool SrcClmCustomClmFlg => bool.Parse(Configuration["SrcClmCustomClmFlg"]);
+
         //コピー先カラム
         public string DestinationColumn => Configuration["DestinationColumn"];
+
+        //コピー先カラムがカスタムカラムか否か
+        public bool DestClmCustomClmFlg => bool.Parse(Configuration["DestClmCustomClmFlg"]);
 
     }
 }
