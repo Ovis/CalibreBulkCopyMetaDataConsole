@@ -30,5 +30,8 @@ namespace CalibreSetMetaData.Domain
         //コピー先カラムがカスタムカラムか否か
         public bool DestClmCustomClmFlg => bool.Parse(Configuration["DestClmCustomClmFlg"]);
 
+        //部分一致時該当値コピー処理実施
+        public bool CopyWhenIncludedFlg => bool.Parse(Configuration["CopyWhenIncludedFlg"]);
+
     }
 }
