@@ -1,5 +1,6 @@
 ﻿using CalibreSetMetaData.Domain;
 using Codeplex.Data;
+using Microsoft.VisualBasic;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -42,18 +43,9 @@ namespace CalibreSetMetaData
             psInfo.StandardOutputEncoding = Encoding.UTF8;
 
             // アプリの実行開始
-            using (Process p = Process.Start(psInfo))
+            if (!ExecCalibreCommand(psInfo))
             {
-                output = p.StandardOutput.ReadToEnd();
-
-                output = Regex.Unescape(output.Replace(@"*", "")); // カスタム列のアスタリスク削除
-
-                if (p.ExitCode != 0)
-                {
-                    Console.WriteLine("Error! Calibreを実行中の可能性あり。");
-                    ConsoleWait();
-                    return;
-                }
+                return;
             }
 
             var jsonData = DynamicJson.Parse(output);
@@ -78,7 +70,34 @@ namespace CalibreSetMetaData
                 //対象データが存在するもののみ処理を行う
                 if (item.IsDefined("id") & item.IsDefined(setting.SourceColumn))
                 {
-                    if (setting.CopyWhenIncludedFlg)
+                    if (setting.ConvertHalfWidth)
+                    {
+                        var sourceData = ConvHalfWidth((string)item[setting.SourceColumn]);
+
+                        if(sourceData != (string)item[setting.SourceColumn])
+                        {
+                            //Calibreに値をセットするために引数を設定
+                            psInfo.Arguments = @"set_metadata --field " + (setting.DestClmCustomClmFlg ? "#" : "")
+                                + setting.DestinationColumn + ":\"" + sourceData + "\"" + " --library-path="
+                                + setting.CalibreLibraryPath + " " + item["id"];
+
+                            ExecCalibreCommand(psInfo);
+                        }
+                    }
+                    else if (setting.ReplaceColumnDataFlg)
+                    {
+                        var sourceData = (string)item[setting.SourceColumn];
+
+                        if (!setting.ReplaceColumnData.Any(sourceData.Contains))
+                        {
+                            continue;
+                        }
+
+                        sourceData = setting.ReplaceColumnData.Aggregate(
+                            sourceData, (s, c) => s.Replace(c.ToString(), ""));
+                        
+                    }
+                    else if (setting.CopyWhenIncludedFlg)
                     {
                         //コピー先カラムに値がある場合は処理対象外
                         if (!item.IsDefined(setting.DestinationColumn))
@@ -97,26 +116,7 @@ namespace CalibreSetMetaData
                                 + setting.DestinationColumn + ":\"" + setData + "\"" + " --library-path="
                                 + setting.CalibreLibraryPath + " " + item["id"];
 
-                            try
-                            {
-                                // アプリの実行開始
-                                using (Process p = Process.Start(psInfo))
-                                {
-                                    output = p.StandardOutput.ReadToEnd();
-
-                                    if (p.ExitCode != 0)
-                                    {
-                                        Console.WriteLine("Error!");
-                                        ConsoleWait();
-                                        return;
-                                    }
-                                }
-                            }
-                            catch (Exception e)
-                            {
-                                Console.WriteLine(e.Message);
-                                ConsoleWait();
-                            }
+                            ExecCalibreCommand(psInfo);
                         }
                     }
                     else
@@ -129,26 +129,7 @@ namespace CalibreSetMetaData
                                 + setting.DestinationColumn + ":\"" + item[setting.SourceColumn] + "\"" + " --library-path="
                                 + setting.CalibreLibraryPath + " " + item["id"];
 
-                            try
-                            {
-                                // アプリの実行開始
-                                using (Process p = Process.Start(psInfo))
-                                {
-                                    output = p.StandardOutput.ReadToEnd();
-
-                                    if (p.ExitCode != 0)
-                                    {
-                                        Console.WriteLine("Error!");
-                                        ConsoleWait();
-                                        return;
-                                    }
-                                }
-                            }
-                            catch (Exception e)
-                            {
-                                Console.WriteLine(e.Message);
-                                ConsoleWait();
-                            }
+                            ExecCalibreCommand(psInfo);
                         }
                     }
                 }
@@ -156,6 +137,63 @@ namespace CalibreSetMetaData
 
             Console.WriteLine("Finish.");
             ConsoleWait();
+        }
+
+        /// <summary>
+        /// Calibre実行
+        /// </summary>
+        static bool ExecCalibreCommand(ProcessStartInfo psInfo, string replaceStr = null)
+        {
+            var output = "";
+            try
+            {
+                // アプリの実行開始
+                using (Process p = Process.Start(psInfo))
+                {
+                    output = p.StandardOutput.ReadToEnd();
+
+                    if (replaceStr != null)
+                    {
+                        output = Regex.Unescape(output.Replace(replaceStr, ""));
+                    }
+
+                    if (p.ExitCode != 0)
+                    {
+                        Console.WriteLine("Error! Calibreを実行中の可能性あり。");
+                        ConsoleWait();
+                        return false;
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                ConsoleWait();
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// 半角変換
+        /// </summary>
+        /// <param name="str"></param>
+        /// <returns></returns>
+        static string ConvHalfWidth(string str)
+        {
+            Regex re = new Regex("[０-９Ａ-Ｚａ-ｚ：！？（）－　]+");
+            string output = re.Replace(str, HalfWidthReplacer);
+
+            return output;
+        }
+
+        /// <summary>
+        /// 半角変換マッチ
+        /// </summary>
+        /// <param name="m"></param>
+        /// <returns></returns>
+        static string HalfWidthReplacer(Match m)
+        {
+            return Strings.StrConv(m.Value, VbStrConv.Narrow, 0);
         }
 
         /// <summary>

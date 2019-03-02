@@ -33,5 +33,13 @@ namespace CalibreSetMetaData.Domain
         //部分一致時該当値コピー処理実施
         public bool CopyWhenIncludedFlg => bool.Parse(Configuration["CopyWhenIncludedFlg"]);
 
+        //除去処理フラグ
+        public bool ReplaceColumnDataFlg => bool.Parse(Configuration["ReplaceColumnDataFlg"]);
+
+        //除去対象
+        public string[] ReplaceColumnData => Configuration["ReplaceColumnData"].Split(',');
+
+        //数字、記号、アルファベット半角変換
+        public bool ConvertHalfWidth => bool.Parse(Configuration["ConvertHalfWidth"]);
     }
 }
