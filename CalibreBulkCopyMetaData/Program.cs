@@ -21,8 +21,6 @@ namespace CalibreSetMetaData
 
             ProcessStartInfo psInfo = new ProcessStartInfo();
 
-            string output = "";
-
             // 実行するファイル
             psInfo.FileName = calibreDbPath;
 
@@ -43,7 +41,8 @@ namespace CalibreSetMetaData
             psInfo.StandardOutputEncoding = Encoding.UTF8;
 
             // アプリの実行開始
-            if (!ExecCalibreCommand(psInfo))
+            (bool ret, string output) = ExecCalibreCommand(psInfo, "*");
+            if (!ret)
             {
                 return;
             }
@@ -95,7 +94,14 @@ namespace CalibreSetMetaData
 
                         sourceData = setting.ReplaceColumnData.Aggregate(
                             sourceData, (s, c) => s.Replace(c.ToString(), ""));
-                        
+
+                        //Calibreに値をセットするために引数を設定
+                        psInfo.Arguments = @"set_metadata --field " + (setting.DestClmCustomClmFlg ? "#" : "")
+                            + setting.DestinationColumn + ":\"" + sourceData + "\"" + " --library-path="
+                            + setting.CalibreLibraryPath + " " + item["id"];
+
+                        ExecCalibreCommand(psInfo);
+
                     }
                     else if (setting.CopyWhenIncludedFlg)
                     {
@@ -142,7 +148,7 @@ namespace CalibreSetMetaData
         /// <summary>
         /// Calibre実行
         /// </summary>
-        static bool ExecCalibreCommand(ProcessStartInfo psInfo, string replaceStr = null)
+        static (bool ret,string output) ExecCalibreCommand(ProcessStartInfo psInfo, string replaceStr = null)
         {
             var output = "";
             try
@@ -161,7 +167,7 @@ namespace CalibreSetMetaData
                     {
                         Console.WriteLine("Error! Calibreを実行中の可能性あり。");
                         ConsoleWait();
-                        return false;
+                        return (false, "");
                     }
                 }
             }
@@ -169,8 +175,9 @@ namespace CalibreSetMetaData
             {
                 Console.WriteLine(e.Message);
                 ConsoleWait();
+                return (false, "");
             }
-            return true;
+            return (true, output);
         }
 
         /// <summary>
