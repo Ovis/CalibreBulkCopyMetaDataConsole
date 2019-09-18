@@ -1,0 +1,31 @@
+﻿{
+  "Setting": {
+    "Calibre": {
+      "Path": "C:\\Program Files\\Calibre2",
+      "LibraryPath": ""
+    },
+    "ConvertHalfWidth": {
+      "Enabled": true,
+      "Source": "title"
+    },
+    "DataCopy": {
+      "Enabled": true,
+      "Source": "title",
+      "Destination": "コピー先カラム名"
+    },
+    "Replace": {
+      "Enabled": true,
+      "Source": "title",
+      "IsTextReplace": true,
+      "Destination": "",
+      "StartWith": "(",
+      "EndWith": ")",
+      "ReplaceText": ""
+    },
+    "CopyWhenIncluded": {
+      "Enabled": true,
+      "Source": "title",
+      "Destination": "label"
+    }
+  }
+}
